@@ -557,6 +557,65 @@ input:focus, textarea:focus, select:focus {
 .review-history-item .h-date { font-size: 11px; color: var(--text-muted); }
 .review-history-item .h-delete { cursor: pointer; color: var(--text-muted); font-size: 14px; }
 .review-history-item .h-delete:hover { color: #E53935; }
+
+/* ─── Video Upload & Analysis ─── */
+.video-upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: var(--bg);
+  margin-bottom: 16px;
+}
+.video-upload-zone:hover, .video-upload-zone.drag-over {
+  border-color: var(--pink-400);
+  background: rgba(233,30,99,0.03);
+}
+.video-upload-zone.has-video { border-style: solid; padding: 12px; }
+.video-upload-icon { font-size: 44px; margin-bottom: 8px; }
+.video-upload-text { font-size: 14px; font-weight: 600; }
+.video-upload-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.video-preview-wrap {
+  position: relative; border-radius: 10px; overflow: hidden;
+  background: #000; max-height: 320px;
+}
+.video-preview-wrap video { width: 100%; display: block; max-height: 320px; object-fit: contain; }
+.video-meta-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.video-meta-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: 14px;
+  background: var(--card-bg); border: 1px solid var(--border);
+  font-size: 11px; font-weight: 600;
+}
+.video-meta-tag.good { border-color: #A5D6A7; background: #F1F8E9; color: #2E7D32; }
+.video-meta-tag.warn { border-color: #FFE082; background: #FFFDE7; color: #F57F17; }
+.video-meta-tag.bad { border-color: #EF9A9A; background: #FFF5F5; color: #C62828; }
+.video-frames-storyboard {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 10px 0; margin-top: 8px;
+}
+.video-frame-card {
+  flex: 0 0 110px; text-align: center; cursor: pointer;
+  border-radius: 8px; overflow: hidden;
+  border: 2px solid transparent; transition: all 0.2s;
+}
+.video-frame-card:hover { border-color: var(--pink-400); transform: scale(1.03); }
+.video-frame-card img { width: 110px; height: 155px; object-fit: cover; display: block; border-radius: 6px; }
+.video-frame-time { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+.video-analysis-card {
+  background: linear-gradient(135deg, #F3E5F5, #E8EAF6);
+  border-radius: 12px; padding: 16px; margin-top: 12px;
+}
+.video-analysis-card .analysis-title { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+.video-analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.video-analysis-item {
+  padding: 10px; background: rgba(255,255,255,0.7); border-radius: 8px;
+}
+.video-analysis-item .ai-label { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+.video-analysis-item .ai-value { font-size: 13px; font-weight: 600; }
+
 /* Summary card */
 .review-summary-card {
   border-radius: 14px;
@@ -1244,9 +1303,26 @@ input:focus, textarea:focus, select:focus {
       <h2>📊 内容复盘</h2>
       <p>录入视频数据，自动多维度分析 + 对标热点基准 + 生成改进方案</p>
     </div>
+    <!-- 视频上传分析 -->
+    <div class="card" id="reviewUploadCard">
+      <div class="card-title">📤 上传视频素材</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">上传你的视频文件，系统将自动提取元数据、生成帧故事板、预填分析参数</p>
+      <div class="video-upload-zone" id="videoUploadZone" onclick="document.getElementById('videoFileInput').click()">
+        <div class="video-upload-icon">🎬</div>
+        <div class="video-upload-text">点击或拖拽上传视频</div>
+        <div class="video-upload-hint">支持 MP4 / MOV / WebM，最大 500MB</div>
+        <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="handleVideoUpload(this.files[0])">
+      </div>
+    <!-- 视频预览 + 元数据 -->
+    <div id="videoPreviewArea" style="display:none;"></div>
+    <div id="videoResetArea" style="display:none;text-align:center;margin-top:10px;">
+      <button class="btn" style="font-size:12px;padding:6px 16px;" onclick="resetVideoUpload()">🔄 重新上传视频</button>
+    </div>
+    </div>
     <!-- 视频数据录入 -->
     <div class="card" id="reviewInputCard">
-      <div class="card-title">📹 录入视频数据</div>
+      <div class="card-title">📹 视频数据补充</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">上传视频后部分字段已自动填充，可手动修改</p>
       <div class="review-form-grid">
         <div class="review-form-group">
           <label>视频标题</label>
@@ -1757,6 +1833,7 @@ function init() {
   renderEngErrorBook();
   renderCustomization();
   updateDate();
+  setupVideoDragDrop();   // Content review video upload
   
   // Navigation
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -2068,6 +2145,380 @@ function openDouyin(e, url) {
 // 内容复盘 — 多维度分析 + 对标热点基准 + 改进方案
 // ============================================================
 let contentReviewSessions = [];
+let uploadedVideoMeta = null; // 存储上传视频的元数据
+
+// ─── 拖拽上传 ───
+function setupVideoDragDrop() {
+  const zone = document.getElementById('videoUploadZone');
+  if (!zone) return;
+  zone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove('drag-over');
+  });
+  zone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleVideoUpload(file);
+  });
+}
+
+// ─── 视频上传处理 ───
+let lastVideoBlobUrl = null;
+
+function handleVideoUpload(file) {
+  if (!file.type.startsWith('video/')) {
+    alert('请上传视频文件（MP4/MOV/WebM等格式）');
+    return;
+  }
+  if (file.size > 500 * 1024 * 1024) {
+    alert('视频文件不能超过 500MB，请压缩后重试');
+    return;
+  }
+
+  // Clean up old blob URL
+  if (lastVideoBlobUrl) {
+    URL.revokeObjectURL(lastVideoBlobUrl);
+    lastVideoBlobUrl = null;
+  }
+
+  const zone = document.getElementById('videoUploadZone');
+  const previewArea = document.getElementById('videoPreviewArea');
+  const resetArea = document.getElementById('videoResetArea');
+  const url = URL.createObjectURL(file);
+  lastVideoBlobUrl = url;
+  const video = document.createElement('video');
+  video.src = url;
+  video.preload = 'metadata';
+  video.controls = true;
+  video.crossOrigin = 'anonymous';
+
+  // Show loading
+  zone.classList.add('has-video');
+  zone.innerHTML = '<div class="video-upload-icon">⏳</div><div class="video-upload-text">正在解析视频…</div>';
+
+  video.onloadedmetadata = function() {
+    const duration = video.duration;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+    const aspectRatio = width / height;
+    const isVertical = height > width;
+    const resolution = Math.max(width, height);
+
+    // Store meta
+    uploadedVideoMeta = {
+      fileName: file.name,
+      fileSize: file.size,
+      fileSizeMB: fileSizeMB,
+      duration: duration,
+      durationMin: (duration / 60).toFixed(1),
+      width: width,
+      height: height,
+      resolution: resolution,
+      aspectRatio: aspectRatio,
+      isVertical: isVertical,
+      format: file.type.split('/')[1] || 'mp4'
+    };
+
+    // Build preview + meta UI
+    let html = '';
+    // Video player
+    html += '<div class="video-preview-wrap"><video src="' + url + '" controls preload="metadata" style="width:100%;max-height:320px;display:block;" id="reviewVideoPlayer"></video></div>';
+
+    // Metadata tags
+    html += '<div class="video-meta-bar">';
+    html += '<span class="video-meta-tag">📁 ' + escHtml(file.name) + '</span>';
+    html += '<span class="video-meta-tag">📦 ' + fileSizeMB + ' MB</span>';
+    html += '<span class="video-meta-tag">⏱️ ' + formatDuration(duration) + '</span>';
+    html += '<span class="video-meta-tag">📐 ' + width + '×' + height + '</span>';
+
+    // Resolution assessment
+    let resTag, resClass;
+    if (resolution >= 1920) { resTag = '🎥 1080p+'; resClass = 'good'; }
+    else if (resolution >= 1280) { resTag = '🎥 720p'; resClass = 'warn'; }
+    else { resTag = '⚠️ 低分辨率'; resClass = 'bad'; }
+    html += '<span class="video-meta-tag ' + resClass + '">' + resTag + '</span>';
+
+    // Aspect ratio
+    if (isVertical) {
+      html += '<span class="video-meta-tag good">📱 竖屏 9:16</span>';
+    } else {
+      html += '<span class="video-meta-tag warn">🖥️ 横屏 ' + aspectRatio.toFixed(2) + ':1</span>';
+    }
+    html += '</div>';
+
+    // Frames storyboard placeholder
+    html += '<div id="videoFramesStoryboard" class="video-frames-storyboard"><span style="font-size:12px;color:var(--text-muted);padding:20px;">⏳ 正在提取关键帧…</span></div>';
+
+    // Auto-analysis placeholder
+    html += '<div id="videoAutoAnalysis"></div>';
+
+    previewArea.innerHTML = html;
+    previewArea.style.display = 'block';
+    zone.style.display = 'none';
+    document.getElementById('videoResetArea').style.display = 'block';
+
+    // Auto-fill form fields
+    document.getElementById('rvDuration').value = (duration / 60).toFixed(1);
+    // Suggest platform based on aspect ratio
+    if (isVertical) {
+      document.getElementById('rvPlatform').value = '抖音';
+    } else if (duration > 180) {
+      document.getElementById('rvPlatform').value = 'B站';
+    }
+    // Auto-check features based on metadata
+    autoDetectFeatures(video, duration);
+
+    // Extract frames (delay to let video seek)
+    setTimeout(function() {
+      extractVideoFrames(video, duration, 6);
+      generateVideoAutoAnalysis();
+    }, 500);
+  };
+
+  video.onerror = function() {
+    zone.classList.remove('has-video');
+    zone.innerHTML = '<div class="video-upload-icon">❌</div><div class="video-upload-text">视频解析失败</div><div class="video-upload-hint">请检查文件格式是否正确，或尝试其他视频</div>';
+  };
+}
+
+// ─── 自动检测视频特征 ───
+function autoDetectFeatures(video, duration) {
+  const checks = document.querySelectorAll('.rvCheckFormat');
+  const autoFeatures = [];
+
+  // Duration-based
+  if (duration <= 90) autoFeatures.push('hook'); // Short video likely has hook
+
+  // Resolution-based
+  if (video.videoWidth >= 1920) {
+    autoFeatures.push('subtitle'); // High quality, likely professional
+    autoFeatures.push('bgm');
+  }
+
+  // Aspect ratio
+  if (video.videoHeight > video.videoWidth) {
+    autoFeatures.push('firstPerson'); // Vertical often = selfie style
+  }
+
+  // Mark suggested features with a visual indicator
+  checks.forEach(function(cb) {
+    const label = cb.closest('.review-checkbox');
+    if (autoFeatures.includes(cb.value) && !cb.checked) {
+      label.style.borderColor = '#4CAF50';
+      label.style.background = '#F1F8E9';
+      label.title = 'AI 建议勾选此项';
+    }
+  });
+}
+
+// ─── 提取关键帧 ───
+function extractVideoFrames(video, duration, numFrames) {
+  const storyboard = document.getElementById('videoFramesStoryboard');
+  if (!storyboard) return;
+
+  // Seek to a position and capture
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 220;
+  canvas.height = 310;
+
+  const frames = [];
+  for (let i = 0; i < numFrames; i++) {
+    const time = (duration / (numFrames + 1)) * (i + 1); // Skip 0s and end
+    frames.push(time);
+  }
+
+  let html = '';
+  let captured = 0;
+
+  function captureNext(index) {
+    if (index >= frames.length) {
+      storyboard.innerHTML = html;
+      return;
+    }
+
+    const time = frames[index];
+    video.currentTime = time;
+
+    video.onseeked = function() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      html += '<div class="video-frame-card" onclick="seekPreviewTo(' + time.toFixed(1) + ')" title="点击跳转到 ' + formatDuration(time) + '">';
+      html += '<img src="' + dataUrl + '" alt="' + formatDuration(time) + '">';
+      html += '<div class="video-frame-time">' + formatDuration(time) + '</div>';
+      html += '</div>';
+      captured++;
+      if (captured % 2 === 0) {
+        storyboard.innerHTML = html + '<span style="font-size:11px;color:var(--text-muted);padding:20px;">提取中 ' + captured + '/' + frames.length + '…</span>';
+      }
+      captureNext(index + 1);
+    };
+  }
+
+  captureNext(0);
+}
+
+function seekPreviewTo(time) {
+  const player = document.getElementById('reviewVideoPlayer');
+  if (player) {
+    player.currentTime = time;
+    player.play().catch(function(){});
+  }
+}
+
+// ─── 视频自动分析报告 ───
+function generateVideoAutoAnalysis() {
+  if (!uploadedVideoMeta) return;
+  const m = uploadedVideoMeta;
+
+  // Duration analysis
+  let durationAdvice, durationLevel;
+  if (m.duration <= 60) {
+    durationAdvice = '短视频（≤60秒），适合抖音/快手，完播率优势明显';
+    durationLevel = 'good';
+  } else if (m.duration <= 180) {
+    durationAdvice = '中等时长（1-3分钟），适合B站/小红书，需要结构紧凑维持注意力';
+    durationLevel = 'warn';
+  } else {
+    durationAdvice = '长视频（>3分钟），仅适合B站深度内容，抖音端完播率会很低';
+    durationLevel = 'bad';
+  }
+
+  // Resolution analysis
+  let resAdvice, resLevel;
+  if (m.resolution >= 1920) {
+    resAdvice = '1080p高清，制作质量良好，满足所有平台标准';
+    resLevel = 'good';
+  } else if (m.resolution >= 1280) {
+    resAdvice = '720p标清，B站可接受，抖音/小红书建议升级到1080p';
+    resLevel = 'warn';
+  } else {
+    resAdvice = '分辨率偏低，各平台算法对低清视频推流会受限';
+    resLevel = 'bad';
+  }
+
+  // Format recommendations
+  let formatAdvice;
+  if (m.isVertical) {
+    formatAdvice = '竖屏 9:16，天然适合抖音/快手/小红书竖屏信息流';
+  } else {
+    formatAdvice = '横屏，适合B站/YouTube，但不适合抖音/快手信息流场景（会被裁剪或留黑边）';
+  }
+
+  // File size
+  let sizeAdvice;
+  if (m.fileSizeMB < 50) {
+    sizeAdvice = '文件较小，上传速度快，不影响发布体验';
+  } else if (m.fileSizeMB < 200) {
+    sizeAdvice = '文件适中，WiFi环境下上传无压力';
+  } else {
+    sizeAdvice = '文件偏大，建议用剪映导出时选择"720p"或"H.265"编码减小体积';
+  }
+
+  // Scene analysis hint (heuristic based on duration)
+  let sceneAdvice;
+  if (m.duration <= 30) {
+    sceneAdvice = '极短视频，建议全程聚焦一个核心画面/操作，避免频繁转场';
+  } else if (m.duration <= 90) {
+    sceneAdvice = '建议2-3个场景切换，保持每30秒一个视觉变化点';
+  } else {
+    sceneAdvice = '长视频需要至少4-5个场景变化，每30-45秒设置一个"画面钩子"维持新鲜感';
+  }
+
+  // Overall pre-score
+  let overallScore = 5;
+  if (m.resolution >= 1920) overallScore += 2;
+  if (m.isVertical) overallScore += 1;
+  if (m.duration <= 90) overallScore += 1;
+  if (m.duration <= 180 && m.duration > 60) overallScore += 0.5;
+  overallScore = Math.min(10, overallScore);
+
+  // Build analysis HTML
+  const container = document.getElementById('videoAutoAnalysis');
+  if (!container) return;
+
+  let html = '<div class="video-analysis-card">';
+  html += '<div class="analysis-title">🤖 AI 视频智能分析</div>';
+  html += '<div class="video-analysis-grid">';
+
+  html += buildAIAnalysisItem('⏱️ 时长评估', durationAdvice, '时长 ' + formatDuration(m.duration));
+  html += buildAIAnalysisItem('🎥 画质评估', resAdvice, m.width + '×' + m.height);
+  html += buildAIAnalysisItem('📐 画面比例', formatAdvice, m.isVertical ? '9:16 竖屏' : '16:9 横屏');
+  html += buildAIAnalysisItem('📦 文件大小', sizeAdvice, m.fileSizeMB + ' MB');
+  html += buildAIAnalysisItem('🎬 场景建议', sceneAdvice, '预估分析');
+  html += buildAIAnalysisItem('📊 基础预估分', '基于视频参数的综合预判', overallScore.toFixed(0) + '/10 分');
+
+  html += '</div>';
+
+  // Quick tips
+  html += '<div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.6);border-radius:8px;font-size:12px;">';
+  html += '<strong>💡 快速建议：</strong>';
+  const tips = [];
+  if (!m.isVertical) tips.push('横屏视频在抖音会被大幅裁剪，建议拍摄时就用竖屏');
+  if (m.duration > 180) tips.push('时长偏长，可考虑剪辑出60秒"精华版"双平台分发');
+  if (m.resolution < 1920) tips.push('分辨率未达1080p，下次拍摄检查相机设置');
+  if (m.fileSizeMB > 200) tips.push('文件偏大，导出时选择H.265编码可压缩40%且画质不变');
+  html += tips.length > 0 ? tips.join('；') + '。' : '视频规格整体良好，继续填写下方数据获取详细分析。';
+  html += '</div>';
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function buildAIAnalysisItem(label, value, metric) {
+  return '<div class="video-analysis-item">' +
+    '<div class="ai-label">' + label + '</div>' +
+    '<div class="ai-value" title="' + value + '">' + metric + '</div>' +
+    '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + value + '</div>' +
+    '</div>';
+}
+
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// ─── 重置视频上传 ───
+function resetVideoUpload() {
+  if (lastVideoBlobUrl) {
+    URL.revokeObjectURL(lastVideoBlobUrl);
+    lastVideoBlobUrl = null;
+  }
+  uploadedVideoMeta = null;
+  document.getElementById('videoPreviewArea').style.display = 'none';
+  document.getElementById('videoPreviewArea').innerHTML = '';
+  document.getElementById('videoResetArea').style.display = 'none';
+
+  const zone = document.getElementById('videoUploadZone');
+  zone.classList.remove('has-video');
+  zone.style.display = '';
+  zone.innerHTML = '<div class="video-upload-icon">🎬</div><div class="video-upload-text">点击或拖拽上传视频</div><div class="video-upload-hint">支持 MP4 / MOV / WebM，最大 500MB</div>';
+
+  // Reset auto-checked features
+  document.querySelectorAll('.rvCheckFormat').forEach(function(cb) {
+    cb.checked = false;
+    var label = cb.closest('.review-checkbox');
+    if (label) {
+      label.classList.remove('checked');
+      label.style.borderColor = '';
+      label.style.background = '';
+      label.title = '';
+    }
+  });
+  // Clear duration field
+  document.getElementById('rvDuration').value = '';
+}
 
 // 从热点视频中提取基准数据
 function getBenchmarkData() {
@@ -2244,14 +2695,39 @@ function submitReview() {
     dimScores: dims.map(d => ({ id: d.id, score: d.score })),
     views: views, likes: likes, comments: comments, shares: shares,
     engageRate: parseFloat(engageRate),
-    formats: formats
+    formats: formats,
+    hasVideo: !!uploadedVideoMeta,
+    videoMeta: uploadedVideoMeta ? {
+      fileName: uploadedVideoMeta.fileName,
+      resolution: uploadedVideoMeta.width + '×' + uploadedVideoMeta.height,
+      duration: uploadedVideoMeta.durationMin,
+      fileSize: uploadedVideoMeta.fileSizeMB,
+      isVertical: uploadedVideoMeta.isVertical
+    } : null
   };
   contentReviewSessions.unshift(session);
   if (contentReviewSessions.length > 20) contentReviewSessions = contentReviewSessions.slice(0, 20);
   saveState();
   renderReviewHistory();
   
-  document.getElementById('reviewResults').innerHTML = html;
+  // If video was uploaded, prepend video analysis summary
+  let finalHtml = html;
+  if (uploadedVideoMeta) {
+    finalHtml = '<div class="card" style="margin-top:16px;border-left:4px solid #7C4DFF;">' +
+      '<div class="card-title">🎬 视频素材分析摘要</div>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;">' +
+      '<div><strong>文件名：</strong>' + escHtml(uploadedVideoMeta.fileName) + '</div>' +
+      '<div><strong>分辨率：</strong>' + uploadedVideoMeta.width + '×' + uploadedVideoMeta.height + '</div>' +
+      '<div><strong>时长：</strong>' + formatDuration(uploadedVideoMeta.duration) + '</div>' +
+      '<div><strong>大小：</strong>' + uploadedVideoMeta.fileSizeMB + ' MB</div>' +
+      '<div><strong>画幅：</strong>' + (uploadedVideoMeta.isVertical ? '竖屏 9:16' : '横屏') + '</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;font-size:12px;color:var(--text-muted);background:#F5F0FF;padding:8px 12px;border-radius:8px;">' +
+      '💡 已根据视频素材的实际参数对分析结果进行加权。建议结合手动填入的播放数据来获得完整评估。' +
+      '</div></div>' + finalHtml;
+  }
+
+  document.getElementById('reviewResults').innerHTML = finalHtml;
   document.getElementById('reviewResults').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -2300,6 +2776,9 @@ function calcProductionScore(formats, platform, category) {
   if (formats.includes('firstPerson')) score += 1;
   if (formats.includes('compare')) score += 0.5;
   if (platform === 'B站') score -= 1; // B站 expectations higher
+  // Use uploaded video resolution for quality bonus
+  if (uploadedVideoMeta && uploadedVideoMeta.resolution >= 1920) score += 1;
+  else if (uploadedVideoMeta && uploadedVideoMeta.resolution >= 1280) score += 0.5;
   return Math.min(10, score);
 }
 
@@ -2418,12 +2897,26 @@ function analyzeRetention(duration, formats, category, bench) {
 function analyzeProduction(formats, platform, category) {
   let strength = '', weakness = '', improve = '';
   
+  // Resolution check from uploaded video
+  if (uploadedVideoMeta) {
+    if (uploadedVideoMeta.resolution >= 1920) {
+      strength = '视频分辨率为 ' + uploadedVideoMeta.width + '×' + uploadedVideoMeta.height + '（1080p高清），符合所有平台画质标准，画面细节清晰可见。';
+    } else if (uploadedVideoMeta.resolution >= 1280) {
+      weakness = '视频分辨率 ' + uploadedVideoMeta.width + '×' + uploadedVideoMeta.height + '（720p），在B站和抖音上属于及格水平，但细节不够锐利。建议下次拍摄时将相机/手机设置为1080p。';
+    } else {
+      weakness = '视频分辨率偏低（' + uploadedVideoMeta.width + '×' + uploadedVideoMeta.height + '），各平台算法会降低低清晰度视频的推荐权重。请检查拍摄设备的录制设置。';
+    }
+    if (!uploadedVideoMeta.isVertical && (platform === '���音' || platform === '快手')) {
+      weakness += (weakness ? ' ' : '') + '上传的是横屏视频，但选择发布平台为' + platform + '。横屏视频在竖屏信息流中会被大幅裁剪或留黑边，严重影响用户体验和算法推荐。建议拍摄时使用竖屏构图。';
+    }
+  }
+  
   if (formats.includes('subtitle') && formats.includes('firstPerson')) {
-    strength = '全程字幕+第一人称拍摄组合，是当前最主流的短视频制作范式。第一人称增强代入感，字幕保证信息传递，制作完整度较高。';
+    strength += (strength ? ' ' : '') + '全程字幕+第一人称拍摄组合，是当前最主流的短视频制作范式。';
   } else if (formats.includes('subtitle')) {
-    strength = '全程字幕是加分项，说明你重视用户的观看体验和内容可及性。';
+    strength += (strength ? ' ' : '') + '全程字幕是加分项，说明你重视用户的观看体验和内容可及性。';
   } else if (formats.includes('firstPerson')) {
-    strength = '��一人称拍摄视角增强了真实感和亲切感，观众更容易产生信任和共鸣，这是短视频建立人设的核心手法。';
+    strength += (strength ? ' ' : '') + '第一人称拍摄视角增强了真实感和亲切感，观众更容易产生信任和共鸣。';
   }
   
   if (!formats.includes('subtitle')) {
