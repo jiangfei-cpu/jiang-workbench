@@ -1129,6 +1129,9 @@ input:focus, textarea:focus, select:focus {
 </style>
 </head>
 <body>
+<div id="debug-info" style="display:none;background:#fff3cd;border:2px solid #ffc107;padding:10px;margin:10px;border-radius:8px;font-family:monospace;font-size:13px;position:fixed;top:0;left:0;right:0;z-index:99999;max-height:200px;overflow-y:auto;">
+  <b>🐛 Debug Console</b>
+</div>
 
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
@@ -1711,6 +1714,18 @@ input:focus, textarea:focus, select:focus {
 </div>
 
 <script>
+// DEBUG: 全局错误捕获
+window.onerror = function(msg, url, line, col, err) {
+  var debugEl = document.getElementById('debug-info');
+  if (debugEl) {
+    debugEl.innerHTML += '<div style="color:red;padding:4px;">❌ Line ' + line + ': ' + msg + '</div>';
+    debugEl.style.display = 'block';
+  }
+};
+window.addEventListener('DOMContentLoaded', function() {
+  var debugEl = document.getElementById('debug-info');
+  if (debugEl) { debugEl.innerHTML += '<div style="color:green;">✅ DOMContentLoaded fired</div>'; }
+});
 // ============================================================
 // 全局状态
 // ============================================================
@@ -5361,8 +5376,22 @@ function loadState() {
   } catch(e) { /* ignore */ }
 }
 
-// 启动
-document.addEventListener('DOMContentLoaded', init);
+// 启动（带错误捕获）
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    var debugEl = document.getElementById('debug-info');
+    if (debugEl) { debugEl.innerHTML += '<div style="color:blue;">🚀 init() starting...</div>'; }
+    init();
+    if (debugEl) { debugEl.innerHTML += '<div style="color:green;">✅ init() completed successfully!</div>'; }
+  } catch(e) {
+    var debugEl = document.getElementById('debug-info');
+    if (debugEl) {
+      debugEl.innerHTML += '<div style="color:red;font-weight:bold;">❌ FATAL ERROR: ' + e.message + '</div>';
+      debugEl.innerHTML += '<div style="color:red;">📍 Stack: ' + (e.stack || 'none').split('\n').slice(0,3).join('<br>') + '</div>';
+      debugEl.style.display = 'block';
+    }
+  }
+});
 </script>
 </body>
 </html>
